@@ -1,109 +1,126 @@
 """ load data and conduct data analysis"""
 from datetime import datetime
+import matplotlib.pyplot as plt
+import pandas as pd
 
-## Initialization
-def load_patients(filename):
-    '''The computational complexity of initialization is O(n)'''
-    if not isinstance(filename,str):
-        raise IOError(f"{filename} is not a string.")
-    try:
-        with open(filename,'r') as f:
-            patients=dict()
-            lines=f.readlines()[1:]
+
+class Patient:
+    """Patient."""
+
+    def __init__(self, ID, sex, DOB, race):
+        """Initalize."""
+        self.ID = ID
+        self.sex = sex
+        self.DOB = DOB
+        self.race = race
+
+    @property
+    def age(self):
+        """Calculate patient's age."""
+        now = datetime.now()
+        birthday = self.DOB
+        Age = round(((now - birthday).days) / 365, 1)
+        return Age
+
+    def __lt__(self, value):
+        """Less than."""
+        if not isinstance(value, float):
+            raise ValueError(f"{value} is not a float.")
+        if self.age < value:
+            return True
+        return False
+
+    def __gt__(self, value):
+        """greater than."""
+        if not isinstance(value, float):
+            raise ValueError(f"{value} is not a float.")
+        if self.age > value:
+            return True
+        return False
+
+    def plot(self, LabName, Filename):
+        """Plotting."""
+        if not isinstance(LabName, str):
+            raise ValueError(f"{LabName} is not a string.")
+        if not isinstance(Filename, str):
+            raise ValueError(f"{Filename} is not a string.")
+        rec = dict()
+        with open("LabsCorePopulatedTable.txt", "r") as f:
+            lines = f.readlines()[1:]
+            rec["LabName"] = []
+            rec["LabValue"] = []
+            rec["LabUnit"] = []
+            rec["LabDateTime"] = []
             for line in lines:
-                words=line.strip().split('\t')
-                ID=words[0]
-                birthday=datetime.strptime(words[2], "%Y-%m-%d %H:%M:%S.%f")
-                patients[f"{ID}"]={"Birthday":birthday}
-        return patients
-    except:
-        raise IOError(f"{filename} has wrong format.")
+                words = line.strip().split("\t")
+                if words[0] == self.ID:
+                    rec["LabName"].append(words[2])
+                    rec["LabValue"].append(float(words[3]))
+                    rec["LabUnit"].append(words[4])
+                    DateTime = datetime.strptime(words[5], "%Y-%m-%d %H:%M:%S.%f")
+                    rec["LabDateTime"].append(DateTime)
+            patient_rec = pd.DataFrame(rec)
+            plot_data = patient_rec.loc[patient_rec["LabName"] == LabName]
+            x = plot_data["LabDateTime"]
+            y = plot_data["LabValue"]
+        plt.scatter(x, y)
+        plt.title(f"{self.ID}: {LabName}")
+        plt.xlabel("Time")
+        plt.ylabel(f"{LabName}")
+        plt.savefig(Filename)
 
-def load_labs(filename):
-    if not isinstance(filename,str):
-        raise IOError(f"{filename} is not a string.")
-    try:
-        with open(filename,'r') as f:
-            patients_record=[]
-            lines=f.readlines()[1:]
-            for line in lines:
-                words=line.strip().split('\t')
-                PatientID=words[0]
-                LabName=words[2]
-                LabValue=words[3]
-                LabDateTime=datetime.strptime(words[5], "%Y-%m-%d %H:%M:%S.%f")
-                record=(PatientID,LabName,LabValue,LabDateTime)
-                patients_record.append(record)
-        return patients_record
-    except:
-        raise IOError(f"{filename} has wrong format.")
-## Capabilities
-### Old patients
 
-def num_older_than(patient,age):
-    '''the compuatational complexity of old_patient function at runtime is O(n)'''
-    if not isinstance(patient,dict):
-        raise TypeError(f"{patient} is not a dictionary.")
-    if not isinstance(age, (int,float)):
-        raise TypeError(f"{age} should be integer or float.")
-    try:
-        now = datetime.now() 
-        sum=0
-        for key,value in patient.items():
-            birthday = value['Birthday']
-            ages = round(((now - birthday).days)/365,1)
-            if ages > age:
-                sum+=1
-        return sum
-    except:
-        raise IOError(f"{patient} has wrong format.")
+class Observation:
+    """Observation values."""
 
-### Sick patients
+    def __init__(self, ID, LabName, LabValue, LabUnit, LabDateTime):
+        """Initalize."""
+        self.ID = ID
+        self.LabName = LabName
+        self.LabValue = LabValue
+        self.LabUnit = LabUnit
+        self.LabDateTime = LabDateTime
 
-def sick_patients(labs, lab, gt_lt, value):
-    '''The compuatational complexity of sick_patient function at runtime is O(n)'''
-    if not isinstance(labs,list):
-        raise TypeError(f"{labs} is not a list.")
-    if not isinstance(lab,str):
-        raise TypeError(f"{lab} is not a string.")
-    if not isinstance(gt_lt,str):
-        raise TypeError(f"{gt_lt} is not a string.")
-    if not isinstance(value, (int,float)):
-        raise TypeError(f"{value} should be integer or float.")
-    try:
-        PatientsList=[]    
-        for record_tuple in labs:
-            if record_tuple[1] == lab:
-                criteria= record_tuple[2]+gt_lt+str(value)
-                if eval(criteria) == True:
-                    PatientsList.append(record_tuple[0])
-        return list(set(PatientsList))
-    except:
-        raise IOError(f"{labs} has wrong format.")
 
-def first_admission_age(patients,labs,PatientID):
-    if not isinstance(patients,dict):
-        raise TypeError(f"{patients} is not a dictionary.")
-    if not isinstance(labs,list):
-        raise TypeError(f"{labs} is not a list.")
-    if not isinstance(PatientID,str):
-        raise TypeError(f"{PatientID} is not a string.")
-    try:
-        birthday = patients[f'{PatientID}']['Birthday']
-        AgeList = []
-        for record_tuple in labs:
-            if record_tuple[0] == PatientID:
-                age = round(((record_tuple[3]-birthday).days)/365,1)
-                AgeList.append(age)
-        return min(AgeList)
-    except:
-        raise IOError("Input data have wrong formats.")
-        
 if __name__ == "__main__":
-    patients = load_patients("PatientCorePopulatedTable.txt")
-    print(num_older_than(patients,51.2))
-    # print(len(patients))
-    labs=load_labs("LabsCorePopulatedTable.txt")
-    # print(len(labs))
-    print(sick_patients(labs,"METABOLIC: ALBUMIN", ">", 4.0))
-    print(first_admission_age(patients,labs,"1A8791E3-A61C-455A-8DEE-763EB90C9B2C"))
+    ID = [
+        "1A8791E3-A61C-455A-8DEE-763EB90C9B2C",
+        "6E70D84D-C75F-477C-BC37-9177C3698C66",
+    ]
+    patient = []
+    with open("PatientCorePopulatedTable.txt", "r") as f:
+        lines = f.readlines()[1:]
+        for line in lines:
+            words = line.strip().split("\t")
+            for i in range(0, len(ID)):
+                if words[0] == ID[i]:
+                    sex = words[1]
+                    DOB = datetime.strptime(words[2], "%Y-%m-%d %H:%M:%S.%f")
+                    race = words[3]
+                    patient.append(Patient(ID[i], sex, DOB, race))
+
+    record = []
+    with open("LabsCorePopulatedTable.txt", "r") as f:
+        lines = f.readlines()[1:]
+        for i in range(0, len(ID)):
+            LabName = []
+            LabValue = []
+            LabUnit = []
+            LabDateTime = []
+            for line in lines:
+                words = line.strip().split("\t")
+                if words[0] == ID[i]:
+                    LabName.append(words[2])
+                    LabValue.append(float(words[3]))
+                    LabUnit.append(words[4])
+                    DateTime = datetime.strptime(words[5], "%Y-%m-%d %H:%M:%S.%f")
+                    LabDateTime.append(DateTime)
+            Record = Observation(ID, LabName, LabValue, LabUnit, LabDateTime)
+            record.append(Record)
+
+    # print(patient[0].age)
+    # print(patient[1].age)
+    # print(patient[1].__gt__(40.0))
+    # print(len(record[1].LabValue))
+    # print(record[0].LabDateTime)
+    # patient[0].plot("URINALYSIS: PH", "ph_over_time.png")
