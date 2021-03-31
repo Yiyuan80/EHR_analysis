@@ -1,31 +1,42 @@
 # EHR_analysis
 ## setup instructions
-`ehr_analysis` includes 5 modules: load_patients, load_labs, num_older_than,  sick_patients, first_admission_age.
+`ehr_analysis` includes 2 classes: `Patient` and `Observation`.
 
-`load_patients(filename)`: reads patients' information and returns a dictionary that includes patients' ID and birthday. `filename` shoule be a string.
+`Patient` is oriented towards patient's basic information. It has 1 instance atrributes: ID. It also includes 4 properties: `sex`, `DOB`, `race`, `age`, and 3 functions: `__gt__`, `__lt__` and `plot`.
 
-`load_labs(filename)`: reads patients' lab record and returns a list that includes patients' ID, lab name, lab value and lab date time. `filename` shoule be a string.
+`Patient.sex` returns patient's sex and it is a property.
 
-`num_older_than(patient,age)`: returns the number of patients older than a given age (in years). `patient` should be a dictionary. `age` should be integer or float.
+`Patient.DOB` returns patient's birthday and it is a property.
 
-`sick_patients(labs, lab, gt_lt, value)`: returns a (unique) list of patients who have a given test with value above (">") or below ("<") a given level. `labs` should be a list. `lab` and `gt_lt` should be string type. `value` should be integer or float.
+`Patient.race` returns patient's race and it is a property.
 
-`first_admission_age(patients,labs,PatientID)`: computes the age at first admission of any given patient. `patients` should be a dictionary. `labs` should be a list. `PatientID` should be a string.
+`Patient.age` calculates the patient's age in float and it is a property.
+
+`Patient.__gt__(value)` returns whether the patient's age is greater than the input value. The input `value` should be a float.
+
+`Patient.__lt__(value)` returns whether the patient's age is less than the input value. The input argument `value` should be a float.
+
+`Patient.plot(LabName, Filename)` plots the patient's lab value over time and saves the image as the input filename. The input arguments `LabName` and `Filename` should be strings.
+
+`Observation` is oriented towards patient's lab record. It has 1 instance atrributes: ID and 4 properties: `LabName`, `LabValue`, `LabUnit`, `LabDateTime`.
 
 ## examples
 ```python
->> patients = load_patients("PatientCorePopulatedTable.txt")
+>> patient1 = Patient("1A8791E3-A61C-455A-8DEE-763EB90C9B2C")
+>> patient1.sex
+Male
 
->>labs = load_labs("LabsCorePopulatedTable.txt")
+>> patient1.race
+Asian
 
->> num_older_than(patients, 51.2)
-75
+>> patient1.age
+47.7
 
->> sick_patients(labs,"METABOLIC: ALBUMIN", ">", 4.0)
-['C54B5AAD-98E8-472D-BAA0-638D9F3BD024', '69B5D2A0-12FD-46EF-A5FF-B29C4BAFBE49',...]
+>> patient1.sex__lt__(50.0)
+True
 
->>first_admission_age(patients,labs,"1A8791E3-A61C-455A-8DEE-763EB90C9B2C")
-18.9
+>> Patient().plot("URINALYSIS: PH", "ph_over_time.png")
 ```
+
 ## testing instructions
-To test your functions, you need to add test function in `test_ehr_analysis.py` and use pytest.
+`test_ehr_analysis.py` includes 2 functions to test `Patient` and `Observation`: `test_Patient` and `test_Observation`. To test your functions in the two classes, you need to add test function in `test_ehr_analysis.py` and run `pytest test_ehr_analysis.py` in your terminal.
