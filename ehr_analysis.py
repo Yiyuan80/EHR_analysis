@@ -1,109 +1,204 @@
 """ load data and conduct data analysis"""
 from datetime import datetime
+import matplotlib.pyplot as plt
+import pandas as pd
+import sqlite3
 
-## Initialization
-def load_patients(filename):
-    '''The computational complexity of initialization is O(n)'''
-    if not isinstance(filename,str):
-        raise IOError(f"{filename} is not a string.")
-    try:
-        with open(filename,'r') as f:
-            patients=dict()
-            lines=f.readlines()[1:]
-            for line in lines:
-                words=line.strip().split('\t')
-                ID=words[0]
-                birthday=datetime.strptime(words[2], "%Y-%m-%d %H:%M:%S.%f")
-                patients[f"{ID}"]={"Birthday":birthday}
-        return patients
-    except:
-        raise IOError(f"{filename} has wrong format.")
+# load data
+patientData = sqlite3.connect("patient.db")
+curPatient = patientData.cursor()
+curPatient.execute(
+    "CREATE TABLE IF NOT EXISTS PatientInfo(ID TEXT, SEX TEXT, DOB DATE, RACE TEXT)"
+)
+with open("PatientCorePopulatedTable.txt", "r") as f:
+    lines = f.readlines()[1:]
+    for line in lines:
+        words = line.strip().split("\t")
+        curPatient.execute("INSERT INTO PatientInfo VALUES (?, ?, ?, ?)", words[0:4])
+curPatient.execute("CREATE INDEX PatientID ON PatientInfo(ID)")
+patientData.commit()
 
-def load_labs(filename):
-    if not isinstance(filename,str):
-        raise IOError(f"{filename} is not a string.")
-    try:
-        with open(filename,'r') as f:
-            patients_record=[]
-            lines=f.readlines()[1:]
-            for line in lines:
-                words=line.strip().split('\t')
-                PatientID=words[0]
-                LabName=words[2]
-                LabValue=words[3]
-                LabDateTime=datetime.strptime(words[5], "%Y-%m-%d %H:%M:%S.%f")
-                record=(PatientID,LabName,LabValue,LabDateTime)
-                patients_record.append(record)
-        return patients_record
-    except:
-        raise IOError(f"{filename} has wrong format.")
-## Capabilities
-### Old patients
 
-def num_older_than(patient,age):
-    '''the compuatational complexity of old_patient function at runtime is O(n)'''
-    if not isinstance(patient,dict):
-        raise TypeError(f"{patient} is not a dictionary.")
-    if not isinstance(age, (int,float)):
-        raise TypeError(f"{age} should be integer or float.")
-    try:
-        now = datetime.now() 
-        sum=0
-        for key,value in patient.items():
-            birthday = value['Birthday']
-            ages = round(((now - birthday).days)/365,1)
-            if ages > age:
-                sum+=1
-        return sum
-    except:
-        raise IOError(f"{patient} has wrong format.")
+labData = sqlite3.connect("lab.db")
+curLab = labData.cursor()
+curLab.execute(
+    "CREATE TABLE IF NOT EXISTS PatientLab(ID TEXT, AdmissionId INTERGER, LabName TEXT, LabValue DECIMAL, LabUnit TEXT, LabDateTime DATE)"
+)
+with open("LabsCorePopulatedTable.txt", "r") as f:
+    lines = f.readlines()[1:]
+    for line in lines:
+        words = line.strip().split("\t")
+        # for i in range(0, len(lines)):
+        curLab.execute("INSERT INTO PatientLab VALUES (?, ?, ?, ?, ?, ?)", words[0:6])
+curLab.execute("CREATE INDEX PatinetID ON PatientLab(ID)")
+labData.commit()
 
-### Sick patients
 
-def sick_patients(labs, lab, gt_lt, value):
-    '''The compuatational complexity of sick_patient function at runtime is O(n)'''
-    if not isinstance(labs,list):
-        raise TypeError(f"{labs} is not a list.")
-    if not isinstance(lab,str):
-        raise TypeError(f"{lab} is not a string.")
-    if not isinstance(gt_lt,str):
-        raise TypeError(f"{gt_lt} is not a string.")
-    if not isinstance(value, (int,float)):
-        raise TypeError(f"{value} should be integer or float.")
-    try:
-        PatientsList=[]    
-        for record_tuple in labs:
-            if record_tuple[1] == lab:
-                criteria= record_tuple[2]+gt_lt+str(value)
-                if eval(criteria) == True:
-                    PatientsList.append(record_tuple[0])
-        return list(set(PatientsList))
-    except:
-        raise IOError(f"{labs} has wrong format.")
+class Patient:
+    """Patient."""
 
-def first_admission_age(patients,labs,PatientID):
-    if not isinstance(patients,dict):
-        raise TypeError(f"{patients} is not a dictionary.")
-    if not isinstance(labs,list):
-        raise TypeError(f"{labs} is not a list.")
-    if not isinstance(PatientID,str):
-        raise TypeError(f"{PatientID} is not a string.")
-    try:
-        birthday = patients[f'{PatientID}']['Birthday']
-        AgeList = []
-        for record_tuple in labs:
-            if record_tuple[0] == PatientID:
-                age = round(((record_tuple[3]-birthday).days)/365,1)
-                AgeList.append(age)
-        return min(AgeList)
-    except:
-        raise IOError("Input data have wrong formats.")
-        
-if __name__ == "__main__":
-    patients = load_patients("PatientCorePopulatedTable.txt")
-    print(num_older_than(patients,51.2))
-    # print(len(patients))
-    labs=load_labs("LabsCorePopulatedTable.txt")
-    # print(len(labs))
-    print(sick_patients(labs,"METABOLIC: ALBUMIN", ">", 4.0))
-    print(first_admission_age(patients,labs,"1A8791E3-A61C-455A-8DEE-763EB90C9B2C"))
+    def __init__(self, ID):
+        """Initalize."""
+        self.ID = ID
+
+    @property
+    def sex(self):
+        """
+        Return patient's sex.
+
+        O(log(N))
+        """
+        curPatient.execute(
+            f"SELECT PatientInfo.SEX FROM PatientInfo WHERE PatientInfo.ID == '{self.ID}'"
+        )
+        return curPatient.fetchone()[0]
+
+    @property
+    def DOB(self):
+        """
+        Return patient's birthday.
+
+        O(log(N))
+        """
+        curPatient.execute(
+            f"SELECT PatientInfo.DOB FROM PatientInfo WHERE PatientInfo.ID == '{self.ID}'"
+        )
+        return curPatient.fetchone()[0]
+
+    @property
+    def race(self):
+        """
+        Return patient's race.
+
+        O(log(N))
+        """
+        curPatient.execute(
+            f"SELECT PatientInfo.RACE FROM PatientInfo WHERE PatientInfo.ID == '{self.ID}'"
+        )
+        return curPatient.fetchone()[0]
+
+    @property
+    def age(self):
+        """
+        Calculate patient's age.
+
+        O(log(N))
+        """
+        now = datetime.now()
+        birthday = datetime.strptime(self.DOB, "%Y-%m-%d %H:%M:%S.%f")
+        Age = round(((now - birthday).days) / 365, 1)
+        return Age
+
+    def __lt__(self, value):
+        """Less than."""
+        if not isinstance(value, float):
+            raise ValueError(f"{value} is not a float.")
+        if self.age < value:
+            return True
+        return False
+
+    def __gt__(self, value):
+        """greater than."""
+        if not isinstance(value, float):
+            raise ValueError(f"{value} is not a float.")
+        if self.age > value:
+            return True
+        return False
+
+    def plot(self, LabName, Filename):
+        """
+        Plotting.
+
+        O(Nlog(N))
+        """
+        if not isinstance(LabName, str):
+            raise ValueError(f"{LabName} is not a string.")
+        if not isinstance(Filename, str):
+            raise ValueError(f"{Filename} is not a string.")
+        Value = []
+        DateTime = []
+        LabValue = curLab.execute(
+            f"SELECT PatientLab.LabValue From PatientLab WHERE PatientLab.ID == '{self.ID}' and PatientLab.LabName == '{LabName}'"
+        ).fetchall()
+        for i in LabValue:
+            Value.append(i[0])
+        LabDateTime = curLab.execute(
+            f"SELECT PatientLab.LabDateTime From PatientLab WHERE PatientLab.ID == '{self.ID}' and PatientLab.LabName == '{LabName}'"
+        ).fetchall()
+        for i in LabDateTime:
+            DateTime.append(datetime.strptime(i[0], "%Y-%m-%d %H:%M:%S.%f"))
+        plt.scatter(DateTime, Value)
+        plt.title(f"{self.ID}: {LabName}")
+        plt.xlabel("Time")
+        plt.ylabel(f"{LabName}")
+        plt.savefig(Filename)
+
+
+class Observation:
+    """Observation values."""
+
+    def __init__(self, ID):
+        """Initalize."""
+        self.ID = ID
+
+    @property
+    def LabName(self):
+        """
+        Return patient's LabName.
+
+        O(log(N))
+        """
+        curLab.execute(
+            f"SELECT PatientLab.LabName FROM PatientLab WHERE PatientLab.ID == '{self.ID}'"
+        )
+        return curLab.fetchall()[0]
+
+    @property
+    def LabValue(self):
+        """
+        Return patient's LabValue.
+
+        O(log(N))
+        """
+        curLab.execute(
+            f"SELECT PatientLab.LabValue FROM PatientLab WHERE PatientLab.ID == '{self.ID}'"
+        )
+        return curLab.fetchall()
+
+    @property
+    def LabUnit(self):
+        """
+        Return patient's LabUnit.
+
+        O(log(N))
+        """
+        curLab.execute(
+            f"SELECT PatientLab.LabUnit FROM PatientLab WHERE PatientLab.ID == '{self.ID}'"
+        )
+        return curLab.fetchall()
+
+    @property
+    def LabDateTime(self):
+        """
+        Return patient's LabDateTime.
+
+        O(log(N))
+        """
+        curLab.execute(
+            f"SELECT PatientLab.LabDateTime FROM PatientLab WHERE PatientLab.ID == '{self.ID}'"
+        )
+        return curLab.fetchall()
+
+
+# if __name__ == "__main__":
+#     ID = "1A8791E3-A61C-455A-8DEE-763EB90C9B2C"
+#     patient1 = Patient(ID)
+#     patient1.plot("URINALYSIS: PH", "ph_over_time.png")
+#     print(patient1.sex)
+#     print(patient1.DOB)
+#     print(patient1.race)
+#     print(patient1.age)
+#     print(patient1.__lt__(50.0))
+#     observation1 = Observation(ID)
+#     print(len(observation1.LabValue))
+#     print(observation1.LabUnit[0][0])
