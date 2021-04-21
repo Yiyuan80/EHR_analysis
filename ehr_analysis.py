@@ -1,109 +1,155 @@
-""" load data and conduct data analysis"""
+import sqlite3
+from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+import urllib.request
 from datetime import datetime
 
-## Initialization
-def load_patients(filename):
-    '''The computational complexity of initialization is O(n)'''
-    if not isinstance(filename,str):
-        raise IOError(f"{filename} is not a string.")
-    try:
-        with open(filename,'r') as f:
-            patients=dict()
-            lines=f.readlines()[1:]
-            for line in lines:
-                words=line.strip().split('\t')
-                ID=words[0]
-                birthday=datetime.strptime(words[2], "%Y-%m-%d %H:%M:%S.%f")
-                patients[f"{ID}"]={"Birthday":birthday}
-        return patients
-    except:
-        raise IOError(f"{filename} has wrong format.")
+APP = FastAPI()
 
-def load_labs(filename):
-    if not isinstance(filename,str):
-        raise IOError(f"{filename} is not a string.")
-    try:
-        with open(filename,'r') as f:
-            patients_record=[]
-            lines=f.readlines()[1:]
-            for line in lines:
-                words=line.strip().split('\t')
-                PatientID=words[0]
-                LabName=words[2]
-                LabValue=words[3]
-                LabDateTime=datetime.strptime(words[5], "%Y-%m-%d %H:%M:%S.%f")
-                record=(PatientID,LabName,LabValue,LabDateTime)
-                patients_record.append(record)
-        return patients_record
-    except:
-        raise IOError(f"{filename} has wrong format.")
-## Capabilities
-### Old patients
+patient = sqlite3.connect("biostat821.db")
+cursor = patient.cursor()
+cursor.execute(
+    "CREATE TABLE IF NOT EXISTS PatientInfo(ID TEXT, SEX TEXT, DOB DATE, RACE TEXT, MaritalStatus TEXT, LANGUAGE TEXT, PercentageBelowPoverty NUMERIC)"
+)
+cursor.execute(
+    "CREATE TABLE IF NOT EXISTS LabInfo(ID TEXT, AdmissionId INTERGER, LabName TEXT, LabValue DECIMAL, LabUnit TEXT, LabDateTime DATE)"
+)
+patient.commit()
+patient.close()
 
-def num_older_than(patient,age):
-    '''the compuatational complexity of old_patient function at runtime is O(n)'''
-    if not isinstance(patient,dict):
-        raise TypeError(f"{patient} is not a dictionary.")
-    if not isinstance(age, (int,float)):
-        raise TypeError(f"{age} should be integer or float.")
-    try:
-        now = datetime.now() 
-        sum=0
-        for key,value in patient.items():
-            birthday = value['Birthday']
-            ages = round(((now - birthday).days)/365,1)
-            if ages > age:
-                sum+=1
-        return sum
-    except:
-        raise IOError(f"{patient} has wrong format.")
 
-### Sick patients
+class URL(BaseModel):
+    url: str
 
-def sick_patients(labs, lab, gt_lt, value):
-    '''The compuatational complexity of sick_patient function at runtime is O(n)'''
-    if not isinstance(labs,list):
-        raise TypeError(f"{labs} is not a list.")
-    if not isinstance(lab,str):
-        raise TypeError(f"{lab} is not a string.")
-    if not isinstance(gt_lt,str):
-        raise TypeError(f"{gt_lt} is not a string.")
-    if not isinstance(value, (int,float)):
-        raise TypeError(f"{value} should be integer or float.")
-    try:
-        PatientsList=[]    
-        for record_tuple in labs:
-            if record_tuple[1] == lab:
-                criteria= record_tuple[2]+gt_lt+str(value)
-                if eval(criteria) == True:
-                    PatientsList.append(record_tuple[0])
-        return list(set(PatientsList))
-    except:
-        raise IOError(f"{labs} has wrong format.")
 
-def first_admission_age(patients,labs,PatientID):
-    if not isinstance(patients,dict):
-        raise TypeError(f"{patients} is not a dictionary.")
-    if not isinstance(labs,list):
-        raise TypeError(f"{labs} is not a list.")
-    if not isinstance(PatientID,str):
-        raise TypeError(f"{PatientID} is not a string.")
+class Lab(BaseModel):
+    lab_name: str
+    lab_value: float
+
+
+@APP.post("/patients")
+def upload_patients(link: URL):
+    """Upload patients files by providing URLs."""
+    with urllib.request.urlopen(link.url) as response:
+        patient_data = []
+        for line in response:
+            line = line.decode("utf-8")
+            row = line.strip("\r\n").replace("\t", ",")
+            item = row.split(",")
+            patient_data.append(item)
+    patient = sqlite3.connect("biostat821.db")
+    cursor = conn.cursor()
+    cursor.executemany(
+        "INSERT INTO patient_data VALUES (?, ?, ?, ?, ?, ?, ?)", patient_data
+    )
+    patient.commit()
+    patient.close()
+    return "Patient data uploaded."
+
+
+@APP.post("/labs")
+def upload_labs(link: URL):
+    """Upload labs files by providing URLs."""
+    with urllib.request.urlopen(link.url) as response:
+        lab_data = []
+        for line in response:
+            line = line.decode("utf-8")
+            row = line.strip("\r\n").replace("\t", ",")
+            item = row.split(",")
+            lab_data.append(item)
+    patient = sqlite3.connect("biostat821.db")
+    cursor = conn.cursor()
+    cursor.executemany("INSERT INTO lab_data VALUES (?, ?, ?, ?, ?, ?)", lab_data)
+    patient.commit()
+    patient.close()
+    return "Lab data uploaded."
+
+
+@APP.get("/patients/{id}")
+def get_patientInfo(id: str):
+    """Return patient infomation according to given ID."""
+    patient = sqlite3.connect("biostat821.db")
+    cursor = patient.cursor()
+    cursor.execute("SELECT * FROM PatientInfo where ID='{id}'")
+    results = cursor.fetchone()
+    if results is None:
+        raise HTTPException(404, f"{id} does not exit.")
+    cursor.close()
+    patinetInfo = {
+        "ID": results[0],
+        "Sex": results[1],
+        "DateOfBirth": results[2],
+        "Race": results[3],
+        "MaritalStatus": results[4],
+        "Language": results[5],
+    }
+    return patinetInfo
+
+
+@APP.get("/patients/{id}/labs")
+def get_labData(id: str):
+    """Return lab data according to given ID."""
+    patient = sqlite3.connect("biostat821.db")
+    cursor = patient.cursor()
+    cursor.execute("SELECT * FROM LabInfo where ID='{id}'")
+    results = []
+    for line in cursor.fetchall():
+        results.append(
+            {
+                "ID": line[1],
+                "LabName": line[2],
+                "Labvalue": line[3],
+                "Labunits": line[4],
+                "Labdatetime": line[5],
+            }
+        )
+    patient.close()
+    return results
+
+
+@APP.get("/num_older_than")
+def num_older_than(age: float) -> int:
+    """Return the number of patients whose ages are older than the input age."""
     try:
-        birthday = patients[f'{PatientID}']['Birthday']
-        AgeList = []
-        for record_tuple in labs:
-            if record_tuple[0] == PatientID:
-                age = round(((record_tuple[3]-birthday).days)/365,1)
-                AgeList.append(age)
-        return min(AgeList)
-    except:
-        raise IOError("Input data have wrong formats.")
-        
-if __name__ == "__main__":
-    patients = load_patients("PatientCorePopulatedTable.txt")
-    print(num_older_than(patients,51.2))
-    # print(len(patients))
-    labs=load_labs("LabsCorePopulatedTable.txt")
-    # print(len(labs))
-    print(sick_patients(labs,"METABOLIC: ALBUMIN", ">", 4.0))
-    print(first_admission_age(patients,labs,"1A8791E3-A61C-455A-8DEE-763EB90C9B2C"))
+        float(age)
+    except ValueError:
+        print("'{age}' is not a number.")
+    patient = sqlite3.connect("biostat821.db")
+    cursor = patient.cursor()
+    cursor.execute("SELECT DOB FROM PatientInfo")
+    now = datetime.now()
+    sum = 0
+    for line in cursor.fetchall()[1:]:
+        DOB = datetime.strptime(line[0], "%Y-%m-%d %H:%M:%S.%f")
+        ages = round(((now - birthday).days) / 365, 1)
+        if ages > age:
+            sum += 1
+    patient.close()
+    return sum
+
+
+@APP.get("/sick_patients")
+def sick_patients(lab_name: str, operator: str, lab_value: float):
+    """Return the IDs of the sick patients."""
+    if not isinstance(lab_name, str):
+        raise TypeError(f"{lab_name} is not a str.")
+    if operator == "<" or operator == ">":
+        pass
+    else:
+        print("The input operator is invalid.")
+        return False
+    if not isinstance(lab_value, float):
+        raise TypeError(f"{lab_value} is not a float.")
+    patient = sqlite3.connect("biostat821.db")
+    cursor = patient.cursor()
+    cursor.execute(f"SELECT ID, LabValue FROM LabInfo WHERE LabName='{lab_name}'")
+    sick_patients = []
+    for line in cursor.fetchall():
+        if operator == "<":
+            if line[1] < lab_value:
+                sick_patients.append(line[0])
+        else:
+            if line[1] > lab_value:
+                sick_patients.append(line[0])
+    patient.close()
+    return list(set(sick_patients))
