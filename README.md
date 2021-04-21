@@ -1,31 +1,57 @@
 # EHR_analysis
 ## setup instructions
-`ehr_analysis` includes 5 modules: load_patients, load_labs, num_older_than,  sick_patients, first_admission_age.
+`ehr_analysis` includes 6 functions: `upload_patients`, `upload_labs`, `get_patientInfo`, `get_labData`, `num_older_than` and `sick_patients`.
 
-`load_patients(filename)`: reads patients' information and returns a dictionary that includes patients' ID and birthday. `filename` shoule be a string.
+`upload_patients` uploads patients files to the provided url.
 
-`load_labs(filename)`: reads patients' lab record and returns a list that includes patients' ID, lab name, lab value and lab date time. `filename` shoule be a string.
+`upload_labs` uploads labs files to the provided url.
 
-`num_older_than(patient,age)`: returns the number of patients older than a given age (in years). `patient` should be a dictionary. `age` should be integer or float.
+`get_patientInfo` returns patient infomation according to given ID.
 
-`sick_patients(labs, lab, gt_lt, value)`: returns a (unique) list of patients who have a given test with value above (">") or below ("<") a given level. `labs` should be a list. `lab` and `gt_lt` should be string type. `value` should be integer or float.
+`get_labData` returns lab data according to given ID.
 
-`first_admission_age(patients,labs,PatientID)`: computes the age at first admission of any given patient. `patients` should be a dictionary. `labs` should be a list. `PatientID` should be a string.
+`num_older_than` returns the number of patients whose ages are older than the input age.
+
+`sick_patients` returns the IDs of the sick patients.
 
 ## examples
-```python
->> patients = load_patients("PatientCorePopulatedTable.txt")
-
->>labs = load_labs("LabsCorePopulatedTable.txt")
-
->> num_older_than(patients, 51.2)
-75
-
->> sick_patients(labs,"METABOLIC: ALBUMIN", ">", 4.0)
-['C54B5AAD-98E8-472D-BAA0-638D9F3BD024', '69B5D2A0-12FD-46EF-A5FF-B29C4BAFBE49',...]
-
->>first_admission_age(patients,labs,"1A8791E3-A61C-455A-8DEE-763EB90C9B2C")
-18.9
+* uploading patients and labs files by providing URLs
+```bash
+> curl -X POST http://localhost/patients -d "{\"url\": \"http://biostat821.colab.duke.edu/patients.txt\"}"
+> curl -X POST http://localhost/labs -d "{\"url\": \"http://biostat821.colab.duke.edu/labs.txt\"}"
 ```
-## testing instructions
-To test your functions, you need to add test function in `test_ehr_analysis.py` and use pytest.
+
+* accessing specific patients by providing their ids
+  ```bash
+  > curl -X GET http://localhost/patients/FB2ABB23-C9D0-4D09-8464-49BF0B982F0F
+  {
+    "gender": "Male",
+    "DOB": "1947-12-28 02:45:40.547",
+    "race": "Unknown",
+    "marital_status": "Married",
+    "language": "Icelandic",
+    "population_percentage_below_poverty": 18.08
+  }
+  ```
+
+* accessing labs belonging to each patient
+  ```bash
+  > curl -X GET http://localhost/patients/FB2ABB23-C9D0-4D09-8464-49BF0B982F0F/labs
+  [
+    {
+      "admission_id": 1,
+      "name": "URINALYSIS: RED BLOOD CELLS",
+      "value": 3.1,
+      "units": "rbc/hpf",
+      "datetime": "1968-10-07 14:41:30.843"
+    },
+    ...
+  ]
+  ```
+
+* other analytics capabilities
+  ```bash
+  > curl -X GET http://localhost/num_older_than?age=51.2
+  54
+  > curl -X GET http://localhost/sick_patients?lab_name=METABOLIC%3A%20ALBUMIN&operator=%3C&lab_value=4.0
+  ["FB2ABB23-C9D0-4D09-8464-49BF0B982F0F", "64182B95-EB72-4E2B-BE77-8050B71498CE"]
